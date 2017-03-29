@@ -335,10 +335,23 @@ class SASProcCommons:
             self.logger.debug("season statement,length: %s,%s", args['season'], len(args['season']))
             code += "season %s;\n" % (args['season'])
         if 'selection' in args:
-            if args['selection'].lower().strip() in ['none', 'forward', 'backward', 'stepwise', 'forwardswap',
+            if isinstance(args['selection'], str):
+                if args['selection'].lower().strip() in ['none', 'forward', 'backward', 'stepwise', 'forwardswap',
                                                      'lar', 'lasso']:
-                self.logger.debug("selection statement,length: %s,%s", args['selection'], len(args['selection']))
-                code += "selection method=%s;\n" % (args['selection'])
+                    self.logger.debug("selection statement,length: %s,%s", args['selection'], len(args['selection']))
+                    code += "selection method=%s;\n" % (args['selection'])
+            if isinstance(args['selection'], dict):
+                if bool(args['selection']): # is the dictionary empty
+                    m = args['selection'].pop('method', '')
+                    me = args['selection'].pop('maxeffects', None)
+                    if me is not None:
+                        if int(me) > 0 and m != 'backward':
+                            args['selection']['maxeffects'] = me
+                    d = args['selection'].pop('details', '')
+                    dstr = ''
+                    if len(d) > 0:
+                        dstr = 'details = %s' % d  
+                    code += "selection method=%s (%s)  %s;"  % (m, ' '.join('{}={}'.format(key, val) for key, val in args['selection'].items()), dstr)
         if 'slope' in args:
             if isinstance(args['slope'], str):
                 self.logger.debug("slope statement,length: %s,%s", args['slope'], len(args['slope']))
@@ -558,9 +571,8 @@ class SASProcCommons:
         if tgt is not None:
             # what object type is target
             if isinstance(tgt, str):
-                # if there is only one word or special character do nothing
-                if len(tgt.split()) == 1 or len(
-                        [word for word in tgt if any(letter in word for letter in '/\:;.%')]) != 0:
+                # if there is special character do nothing
+                if len([word for word in tgt if any(letter in word for letter in '/\:;.%')]) != 0:
                     kwargs['target'] = tgt
                 else:
                     # turn str into list and search for nominals
